@@ -1,0 +1,50 @@
+2024-03-15T18:40:01.142+01:00  INFO 21276 --- [informes] [JavaFX-Launcher] o.s.boot.SpringApplication               : Starting application using Java 17.0.9 with PID 21276 (started by Jonel in D:\eclipse-workspace\informes)
+2024-03-15T18:40:01.144+01:00  INFO 21276 --- [informes] [JavaFX-Launcher] o.s.boot.SpringApplication               : No active profile set, falling back to 1 default profile: "default"
+2024-03-15T18:40:01.634+01:00  INFO 21276 --- [informes] [JavaFX-Launcher] o.s.boot.SpringApplication               : Started application in 0.809 seconds (process running for 1.545)
+2024-03-15T18:40:01.646+01:00 ERROR 21276 --- [informes] [JavaFX Application Thread] c.p.b.i.stages.PrimaryStageInitializer   : Error cargando aplicacion
+
+java.io.FileNotFoundException: class path resource [views/mains.fxml] cannot be resolved to URL because it does not exist
+	at org.springframework.core.io.ClassPathResource.getURL(ClassPathResource.java:230) ~[spring-core-6.1.4.jar:6.1.4]
+	at com.puerto.bobinas.informes.stages.PrimaryStageInitializer.onApplicationEvent(PrimaryStageInitializer.java:41) ~[classes/:na]
+	at com.puerto.bobinas.informes.stages.PrimaryStageInitializer.onApplicationEvent(PrimaryStageInitializer.java:1) ~[classes/:na]
+	at org.springframework.context.event.SimpleApplicationEventMulticaster.doInvokeListener(SimpleApplicationEventMulticaster.java:185) ~[spring-context-6.1.4.jar:6.1.4]
+	at org.springframework.context.event.SimpleApplicationEventMulticaster.invokeListener(SimpleApplicationEventMulticaster.java:178) ~[spring-context-6.1.4.jar:6.1.4]
+	at org.springframework.context.event.SimpleApplicationEventMulticaster.multicastEvent(SimpleApplicationEventMulticaster.java:156) ~[spring-context-6.1.4.jar:6.1.4]
+	at org.springframework.context.support.AbstractApplicationContext.publishEvent(AbstractApplicationContext.java:451) ~[spring-context-6.1.4.jar:6.1.4]
+	at org.springframework.context.support.AbstractApplicationContext.publishEvent(AbstractApplicationContext.java:384) ~[spring-context-6.1.4.jar:6.1.4]
+	at com.puerto.bobinas.informes.App.start(App.java:47) ~[classes/:na]
+	at com.sun.javafx.application.LauncherImpl.lambda$launchApplication1$9(LauncherImpl.java:839) ~[javafx-graphics-21-win.jar:na]
+	at com.sun.javafx.application.PlatformImpl.lambda$runAndWait$12(PlatformImpl.java:483) ~[javafx-graphics-21-win.jar:na]
+	at com.sun.javafx.application.PlatformImpl.lambda$runLater$10(PlatformImpl.java:456) ~[javafx-graphics-21-win.jar:na]
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:399) ~[na:na]
+	at com.sun.javafx.application.PlatformImpl.lambda$runLater$11(PlatformImpl.java:455) ~[javafx-graphics-21-win.jar:na]
+	at com.sun.glass.ui.InvokeLaterDispatcher$Future.run(InvokeLaterDispatcher.java:95) ~[javafx-graphics-21-win.jar:na]
+	at com.sun.glass.ui.win.WinApplication._runLoop(Native Method) ~[javafx-graphics-21-win.jar:na]
+	at com.sun.glass.ui.win.WinApplication.lambda$runLoop$3(WinApplication.java:185) ~[javafx-graphics-21-win.jar:na]
+	at java.base/java.lang.Thread.run(Thread.java:840) ~[na:na]
+
+2024-03-15T18:40:38.663+01:00  INFO 38736 --- [informes] [JavaFX-Launcher] o.s.boot.SpringApplication               : Starting application using Java 17.0.9 with PID 38736 (started by Jonel in D:\eclipse-workspace\informes)
+2024-03-15T18:40:38.665+01:00  INFO 38736 --- [informes] [JavaFX-Launcher] o.s.boot.SpringApplication               : No active profile set, falling back to 1 default profile: "default"
+2024-03-15T18:40:39.180+01:00  INFO 38736 --- [informes] [JavaFX-Launcher] o.s.boot.SpringApplication               : Started application in 0.839 seconds (process running for 1.608)
+2024-03-15T18:40:39.192+01:00 ERROR 38736 --- [informes] [JavaFX Application Thread] c.p.b.i.stages.PrimaryStageInitializer   : Error cargando aplicacion
+
+java.io.FileNotFoundException: class path resource [views/mains.fxml] cannot be resolved to URL because it does not exist
+	at org.springframework.core.io.ClassPathResource.getURL(ClassPathResource.java:230) ~[spring-core-6.1.4.jar:6.1.4]
+	at com.puerto.bobinas.informes.stages.PrimaryStageInitializer.onApplicationEvent(PrimaryStageInitializer.java:41) ~[classes/:na]
+	at com.puerto.bobinas.informes.stages.PrimaryStageInitializer.onApplicationEvent(PrimaryStageInitializer.java:1) ~[classes/:na]
+	at org.springframework.context.event.SimpleApplicationEventMulticaster.doInvokeListener(SimpleApplicationEventMulticaster.java:185) ~[spring-context-6.1.4.jar:6.1.4]
+	at org.springframework.context.event.SimpleApplicationEventMulticaster.invokeListener(SimpleApplicationEventMulticaster.java:178) ~[spring-context-6.1.4.jar:6.1.4]
+	at org.springframework.context.event.SimpleApplicationEventMulticaster.multicastEvent(SimpleApplicationEventMulticaster.java:156) ~[spring-context-6.1.4.jar:6.1.4]
+	at org.springframework.context.support.AbstractApplicationContext.publishEvent(AbstractApplicationContext.java:451) ~[spring-context-6.1.4.jar:6.1.4]
+	at org.springframework.context.support.AbstractApplicationContext.publishEvent(AbstractApplicationContext.java:384) ~[spring-context-6.1.4.jar:6.1.4]
+	at com.puerto.bobinas.informes.App.start(App.java:47) ~[classes/:na]
+	at com.sun.javafx.application.LauncherImpl.lambda$launchApplication1$9(LauncherImpl.java:839) ~[javafx-graphics-21-win.jar:na]
+	at com.sun.javafx.application.PlatformImpl.lambda$runAndWait$12(PlatformImpl.java:483) ~[javafx-graphics-21-win.jar:na]
+	at com.sun.javafx.application.PlatformImpl.lambda$runLater$10(PlatformImpl.java:456) ~[javafx-graphics-21-win.jar:na]
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:399) ~[na:na]
+	at com.sun.javafx.application.PlatformImpl.lambda$runLater$11(PlatformImpl.java:455) ~[javafx-graphics-21-win.jar:na]
+	at com.sun.glass.ui.InvokeLaterDispatcher$Future.run(InvokeLaterDispatcher.java:95) ~[javafx-graphics-21-win.jar:na]
+	at com.sun.glass.ui.win.WinApplication._runLoop(Native Method) ~[javafx-graphics-21-win.jar:na]
+	at com.sun.glass.ui.win.WinApplication.lambda$runLoop$3(WinApplication.java:185) ~[javafx-graphics-21-win.jar:na]
+	at java.base/java.lang.Thread.run(Thread.java:840) ~[na:na]
+
