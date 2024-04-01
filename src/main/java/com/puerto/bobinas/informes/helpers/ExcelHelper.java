@@ -90,7 +90,7 @@ public class ExcelHelper {
 		return fileChooser;
 	}
 
-	public BobinasTemplate leerExcel(String pathString) {
+	public BobinasTemplate getBobinasTemplate(String pathString) {
 		var bobinasTemplate = new BobinasTemplate();
 		var bobinas = new ArrayList<Bobina>();
 		try {
@@ -171,11 +171,11 @@ public class ExcelHelper {
 
 			}
 			is.close();
-//			Map<String, Long> collect = bobinas.stream()
-//					.collect(Collectors.groupingBy(bobina -> bobina.getNombreDestinatario(), Collectors.counting()));
-			var collectCount = bobinas.stream().distinct().collect(Collectors.toList()).size();
+			int totalDestinatarios = bobinas.stream()
+					.collect(Collectors.groupingBy(bobina -> bobina.getNombreDestinatario(), Collectors.counting())).size();
+//			var collectCount = bobinas.stream().distinct().collect(Collectors.toList()).size();
 			var pesoTotal = bobinas.stream().mapToDouble(Bobina::getPesoBrutoPrevisto).sum();
-			bobinasTemplate.setTotalDestinatarios(collectCount);
+			bobinasTemplate.setTotalDestinatarios(totalDestinatarios);
 			bobinasTemplate.setTotalBobinas(bobinas.size());
 			bobinasTemplate.setTotalPeso(pesoTotal);
 			bobinasTemplate.setBobinasList(bobinas);

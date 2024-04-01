@@ -105,23 +105,23 @@ public class MainController {
 			tfRuta.setText(selectedFile.getPath());
 			try {
 				var servicio = new TaskService();
-				servicio.setOnScheduled(event -> {
-					initProgressBar();
-				});
-				servicio.setOnSucceeded(event -> {
-					finishProgressBar();
-					btnPlantilla.setDisable(false);
-
-				});
-				servicio.start();
-				var bobinasTemplate = excelHelper.leerExcel(selectedFile.getPath().toString());
+				var bobinasTemplate = excelHelper.getBobinasTemplate(selectedFile.getPath().toString());
+				txtCliente.setText(bobinasTemplate.getCliente());
+				txtTotalDestinatario.setText(bobinasTemplate.getTotalDestinatarios().toString());
+				txtTotalBobinas.setText(bobinasTemplate.getTotalBobinas().toString());
+				txtTotalPesoBruto.setText(new DecimalFormat("#,###.#").format(bobinasTemplate.getTotalPeso()));
 				var bobinas = bobinasTemplate.getBobinasList();
 				if (!bobinas.isEmpty()) {
-					tableViewHelper.rellenarTableBobinas(tvBobinas, bobinas);
-					txtCliente.setText(bobinasTemplate.getCliente());
-					txtTotalDestinatario.setText(bobinasTemplate.getTotalDestinatarios().toString());
-					txtTotalBobinas.setText(bobinasTemplate.getTotalBobinas().toString());
-					txtTotalPesoBruto.setText(new DecimalFormat("#,###.#").format(bobinasTemplate.getTotalPeso()));
+					servicio.setOnScheduled(event -> {
+						tableViewHelper.rellenarTableBobinas(tvBobinas, bobinas);
+						initProgressBar();
+					});
+					servicio.setOnSucceeded(event -> {
+						finishProgressBar();
+						btnPlantilla.setDisable(false);
+						
+					});
+					servicio.start();
 					;
 				} else {
 					btnPlantilla.setDisable(true);
