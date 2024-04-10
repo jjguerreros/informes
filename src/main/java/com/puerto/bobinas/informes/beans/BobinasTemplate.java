@@ -3,8 +3,17 @@ package com.puerto.bobinas.informes.beans;
 import java.util.ArrayList;
 import java.util.List;
 
+import lombok.Getter;
+import lombok.Setter;
+
 public class BobinasTemplate {
 	private String cliente;
+	@Getter  
+	@Setter
+	private String barco;
+	@Getter
+	@Setter
+	private String encabezado;
 	private Integer totalBobinas;
 	private Integer totalDestinatarios;
 	private Double totalPeso;

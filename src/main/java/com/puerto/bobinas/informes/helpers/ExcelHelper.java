@@ -8,7 +8,9 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -42,6 +44,7 @@ import org.springframework.stereotype.Component;
 import com.puerto.bobinas.informes.beans.Bobina;
 import com.puerto.bobinas.informes.beans.BobinasTemplate;
 import com.puerto.bobinas.informes.constantes.Constantes;
+import com.puerto.bobinas.informes.enums.ClientesEnum;
 import com.puerto.bobinas.informes.utils.Utilidades;
 
 import javafx.stage.FileChooser;
@@ -69,8 +72,10 @@ public class ExcelHelper {
 	private String destinatarioAlias;
 	@Value("${tableView.bobinas.pesoBruto.alias}")
 	private String pesoBrutoAlias;
-	@Value("classpath:plantillas/plantilla.xlsx")
-	private Resource plantilla;
+	@Value("classpath:plantillas/plantilla_thyssen.xlsx")
+	private Resource plantillaThyssen;
+	@Value("classpath:plantillas/plantilla_arcelor.xlsx")
+	private Resource plantillaArcelor;
 	@Value("classpath:img/firma.jpg")
 	private Resource imgFirma;
 
@@ -104,10 +109,31 @@ public class ExcelHelper {
 			Iterator<Row> rowIterator = sheet.iterator();
 			while (rowIterator.hasNext()) {
 				Row row = rowIterator.next();
+				DecimalFormat decimalFormat = new DecimalFormat(Constantes.PATTERN_NUMBER_STRING);
 				switch (row.getRowNum()) {
-				case Constantes.EXCEL_ROW_POS_CLIENTE:
+				case Constantes.EXCEL_ROW_POS_ENCABEZADO:
 					try {
-						bobinasTemplate.setCliente(row.getCell(0).getStringCellValue());
+						Iterator<Cell> cellIteratorEncabezado = row.cellIterator();
+						var encabezadoString = new StringBuilder();
+						while (cellIteratorEncabezado.hasNext()) {
+							Cell cellEncabezado = cellIteratorEncabezado.next();
+							if (cellEncabezado.getCellType().equals(CellType.STRING)) {
+								encabezadoString.append(cellEncabezado.getStringCellValue());
+							} else if (cellEncabezado.getCellType().equals(CellType.NUMERIC)) {
+								encabezadoString.append(decimalFormat.format(cellEncabezado.getNumericCellValue()));
+							} else {
+								encabezadoString.append(StringUtils.EMPTY);
+							}
+						}
+						bobinasTemplate.setEncabezado(encabezadoString.toString());
+						bobinasTemplate.setBarco(obtenerBarco(bobinasTemplate));
+						var clientesStringList = Arrays.asList(ClientesEnum.values()).stream()
+								.map(ClientesEnum::getValor).collect(Collectors.toList());
+						clientesStringList.forEach(clienteString -> {
+							if (bobinasTemplate.getEncabezado().contains(clienteString)) {
+								bobinasTemplate.setCliente(clienteString);
+							}
+						});
 					} catch (IllegalStateException e) {
 						bobinasTemplate.setCliente(StringUtils.EMPTY);
 					}
@@ -142,7 +168,7 @@ public class ExcelHelper {
 						if (destinatarioCell.getCellType().equals(CellType.STRING)) {
 							bobina.setNombreDestinatario(destinatarioCell.getStringCellValue());
 						} else if (destinatarioCell.getCellType().equals(CellType.NUMERIC)) {
-							bobina.setNombreDestinatario(String.valueOf(destinatarioCell.getNumericCellValue()));
+							bobina.setNombreDestinatario(decimalFormat.format(destinatarioCell.getNumericCellValue()));
 						} else {
 							bobina.setNombreDestinatario("Destinatario no identificado");
 						}
@@ -150,7 +176,7 @@ public class ExcelHelper {
 						if (serieCell.getCellType().equals(CellType.STRING)) {
 							bobina.setNumSerie(serieCell.getStringCellValue());
 						} else if (serieCell.getCellType().equals(CellType.NUMERIC)) {
-							bobina.setNumSerie(String.valueOf(serieCell.getNumericCellValue()));
+							bobina.setNumSerie(decimalFormat.format(serieCell.getNumericCellValue()));
 						} else {
 							bobina.setNumSerie("Serie no identificada");
 						}
@@ -172,8 +198,8 @@ public class ExcelHelper {
 			}
 			is.close();
 			int totalDestinatarios = bobinas.stream()
-					.collect(Collectors.groupingBy(bobina -> bobina.getNombreDestinatario(), Collectors.counting())).size();
-//			var collectCount = bobinas.stream().distinct().collect(Collectors.toList()).size();
+					.collect(Collectors.groupingBy(bobina -> bobina.getNombreDestinatario(), Collectors.counting()))
+					.size();
 			var pesoTotal = bobinas.stream().mapToDouble(Bobina::getPesoBrutoPrevisto).sum();
 			bobinasTemplate.setTotalDestinatarios(totalDestinatarios);
 			bobinasTemplate.setTotalBobinas(bobinas.size());
@@ -187,12 +213,38 @@ public class ExcelHelper {
 		return bobinasTemplate;
 	}
 
-	public Path obtenerPlantillaSalida(List<Bobina> bobinas) {
+	private String obtenerBarco(BobinasTemplate bobinasTemplate) {
+		var encabezadoArray = StringUtils.split(bobinasTemplate.getEncabezado());
+		var barco = new StringBuilder();
+		for (String s : encabezadoArray) {
+			if (NumberUtils.isDigits(s)) {
+				break;
+			}
+			if (barco.length() != 0) {
+				barco.append(StringUtils.SPACE);
+			}
+			if (!"MV".equals(s)) {
+				barco.append(s);
+			}
+		}
+		return barco.toString();
+	}
+
+	public Path obtenerPlantillaSalida(BobinasTemplate bobinasTemplate) {
 		try {
+			var bobinas = bobinasTemplate.getBobinasList();
+			var clienteEnum = ClientesEnum.getClienteEnum(bobinasTemplate.getCliente());
 			Map<String, List<Bobina>> bobinasMap = obtenerBobinasMap(bobinas);
 			var fechaHoy = utilidades.obtenerFechaString(Calendar.getInstance().getTime(), "dd/MM/yyyy");
-//			Resource resource = new ClassPathResource("plantillas/plantilla.xlsx");
-			InputStream inputStream = plantilla.getInputStream();
+			InputStream inputStream = null;
+			switch (clienteEnum) {
+			case THYSSEN:
+				inputStream = plantillaThyssen.getInputStream();
+				break;
+			default:
+				inputStream = plantillaArcelor.getInputStream();
+				break;
+			}
 			Workbook workbook = WorkbookFactory.create(inputStream);
 			workbook.setSheetName(0, "Informe");
 			Sheet sheet = workbook.getSheetAt(0);
@@ -232,6 +284,9 @@ public class ExcelHelper {
 						if ("VAR_PESO_BRUTO".equals(stringCellValue)) {
 							bobinaRowPos = rowIndex;
 							pesoBrutoColPos = columnIndex;
+						}
+						if ("VAR_VESSEL".equals(stringCellValue)) {
+							cell.setCellValue(bobinasTemplate.getBarco());
 						}
 						break;
 					default:
@@ -285,8 +340,11 @@ public class ExcelHelper {
 				salidaGeneradaPath.append(salidaDirectory);
 			}
 			salidaGeneradaPath.append("/");
-			salidaGeneradaPath.append("REPORT BODEGA WILSON POLICE 1_");
-			salidaGeneradaPath.append(Calendar.getInstance().getTimeInMillis());
+			salidaGeneradaPath.append("REPORT");
+			salidaGeneradaPath.append(StringUtils.SPACE);
+			salidaGeneradaPath.append("MUELLE");
+			salidaGeneradaPath.append(StringUtils.SPACE);
+			salidaGeneradaPath.append(bobinasTemplate.getBarco());
 			salidaGeneradaPath.append(".xlsx");
 			FileOutputStream outputStream = new FileOutputStream(salidaGeneradaPath.toString());
 			workbook.write(outputStream);

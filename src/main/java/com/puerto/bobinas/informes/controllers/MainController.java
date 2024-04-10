@@ -11,13 +11,18 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
 import com.puerto.bobinas.informes.beans.Bobina;
+import com.puerto.bobinas.informes.beans.BobinasTemplate;
+import com.puerto.bobinas.informes.enums.ClientesEnum;
 import com.puerto.bobinas.informes.helpers.ExcelHelper;
 import com.puerto.bobinas.informes.helpers.TableViewHelper;
 import com.puerto.bobinas.informes.tasks.TaskService;
 
 import javafx.fxml.FXML;
 import javafx.scene.Cursor;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
+import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ProgressBar;
@@ -57,9 +62,13 @@ public class MainController {
 	@FXML
 	private TextField tfRuta;
 	@FXML
+	private TextField tfBArco;
+	@FXML
 	private BorderPane bpPrimary;
 	@FXML
-	private Text txtCliente;
+	private Text txtEncabezado;
+	@FXML
+	private ChoiceBox<ClientesEnum> cbCliente;
 	@FXML
 	private Text txtTotalDestinatario;
 	@FXML
@@ -80,6 +89,8 @@ public class MainController {
 		btnPlantilla.setDisable(true);
 		tableViewHelper.iniciarTableBobinas(tvBobinas);
 		//
+		cbCliente.getItems().addAll(ClientesEnum.values());
+		//
 		limpiarTextosInformativos();
 		//
 		btnImportar.setOnAction(event -> {
@@ -88,6 +99,7 @@ public class MainController {
 		btnPlantilla.setOnAction(event -> {
 			excelGenerarSalida();
 		});
+		//
 	}
 
 	@FXML
@@ -96,7 +108,6 @@ public class MainController {
 		textFlowResultadoPlantilla.setVisible(false);
 		hlResultadoPlantilla.setText(StringUtils.EMPTY);
 		btnPlantilla.setDisable(true);
-		tfRuta.setText(StringUtils.EMPTY);
 		tvBobinas.getItems().clear();
 		textFlowResultadoPlantilla.setVisible(false);
 		Stage primaryStage = (Stage) bpPrimary.getScene().getWindow();
@@ -106,20 +117,28 @@ public class MainController {
 			try {
 				var servicio = new TaskService();
 				var bobinasTemplate = excelHelper.getBobinasTemplate(selectedFile.getPath().toString());
-				txtCliente.setText(bobinasTemplate.getCliente());
+				cbCliente.setValue(ClientesEnum.getClienteEnum(bobinasTemplate.getCliente()));
+				tfBArco.setText(bobinasTemplate.getBarco());
+				//
 				txtTotalDestinatario.setText(bobinasTemplate.getTotalDestinatarios().toString());
 				txtTotalBobinas.setText(bobinasTemplate.getTotalBobinas().toString());
 				txtTotalPesoBruto.setText(new DecimalFormat("#,###.#").format(bobinasTemplate.getTotalPeso()));
+				txtEncabezado.setText(bobinasTemplate.getEncabezado());
+				//
 				var bobinas = bobinasTemplate.getBobinasList();
 				if (!bobinas.isEmpty()) {
 					servicio.setOnScheduled(event -> {
-						tableViewHelper.rellenarTableBobinas(tvBobinas, bobinas);
 						initProgressBar();
+						cbCliente.setDisable(true);
+						tfBArco.setDisable(true);
+						tableViewHelper.rellenarTableBobinas(tvBobinas, bobinas);
 					});
 					servicio.setOnSucceeded(event -> {
 						finishProgressBar();
+						cbCliente.setDisable(false);
+						tfBArco.setDisable(false);
 						btnPlantilla.setDisable(false);
-						
+
 					});
 					servicio.start();
 					;
@@ -134,6 +153,17 @@ public class MainController {
 
 	@FXML
 	public void excelGenerarSalida() {
+		String barcoVal = tfBArco.getText();
+		// TODO: Validaciones
+		if (StringUtils.isBlank(barcoVal)) {
+			Alert alert = new Alert(AlertType.WARNING);
+			alert.setTitle("Errores formulario");
+			alert.setContentText("\"Barco\" no puede estar vacio");
+			alert.setHeaderText(null);
+			alert.initOwner(bpPrimary.getScene().getWindow());
+			alert.show();
+			return;
+		}
 		hlResultadoPlantilla.setText(StringUtils.EMPTY);
 		textFlowResultadoPlantilla.setVisible(false);
 		var service = new TaskService();
@@ -148,8 +178,12 @@ public class MainController {
 			textFlowResultadoPlantilla.setVisible(true);
 		});
 		service.restart();
+		var bobinasTemplate = new BobinasTemplate();
 		var bobinas = tvBobinas.getItems().stream().collect(Collectors.toList());
-		var rutaSalida = excelHelper.obtenerPlantillaSalida(bobinas);
+		bobinasTemplate.setBobinasList(bobinas);
+		bobinasTemplate.setCliente(cbCliente.getValue().getValor());
+		bobinasTemplate.setBarco(barcoVal);
+		var rutaSalida = excelHelper.obtenerPlantillaSalida(bobinasTemplate);
 		hlResultadoPlantilla.setText(rutaSalida.toString());
 		hlResultadoPlantilla.setOnAction(event -> {
 			btnPlantilla.setDisable(true);
@@ -164,7 +198,6 @@ public class MainController {
 	@FXML
 	public void excelNuevo() {
 		limpiarTextosInformativos();
-		tfRuta.setText(StringUtils.EMPTY);
 		textFlowResultadoPlantilla.setVisible(false);
 		pbCargas.setVisible(false);
 		tfRuta.setEditable(false);
@@ -184,9 +217,12 @@ public class MainController {
 	}
 
 	private void limpiarTextosInformativos() {
-		txtCliente.setText(StringUtils.EMPTY);
+		txtEncabezado.setText(StringUtils.EMPTY);
+		cbCliente.setValue(null);
 		txtTotalDestinatario.setText(StringUtils.EMPTY);
 		txtTotalBobinas.setText(StringUtils.EMPTY);
 		txtTotalPesoBruto.setText(StringUtils.EMPTY);
+		tfBArco.setText(StringUtils.EMPTY);
+		tfRuta.setText(StringUtils.EMPTY);
 	}
 }
