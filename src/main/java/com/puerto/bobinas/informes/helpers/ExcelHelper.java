@@ -27,7 +27,6 @@ import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.commons.lang3.time.DateUtils;
 import org.apache.poi.hssf.usermodel.HSSFClientAnchor;
 import org.apache.poi.hssf.usermodel.HSSFPatriarch;
-import org.apache.poi.hssf.usermodel.HSSFPicture;
 import org.apache.poi.hssf.usermodel.HSSFRichTextString;
 import org.apache.poi.hssf.usermodel.HSSFShape;
 import org.apache.poi.hssf.usermodel.HSSFTextbox;
@@ -42,7 +41,21 @@ import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.util.IOUtils;
 import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
+import org.apache.poi.xssf.usermodel.XSSFCreationHelper;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
+import org.apache.poi.xssf.usermodel.XSSFFont;
+import org.apache.poi.xssf.usermodel.XSSFPicture;
+import org.apache.poi.xssf.usermodel.XSSFPictureData;
+import org.apache.poi.xssf.usermodel.XSSFRichTextString;
+import org.apache.poi.xssf.usermodel.XSSFShape;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFSimpleShape;
+import org.apache.poi.xssf.usermodel.XSSFTextBox;
+import org.apache.poi.xssf.usermodel.XSSFTextParagraph;
+import org.apache.poi.xssf.usermodel.XSSFTextRun;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.openxmlformats.schemas.drawingml.x2006.main.CTShapeProperties;
+import org.openxmlformats.schemas.drawingml.x2006.spreadsheetDrawing.CTShape;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
@@ -289,7 +302,7 @@ public class ExcelHelper {
 		Map<Integer, List<Bobina>> bobinasMap = obtenerBobinasMap(bobinasList, bloques, ARCELOR_BLOQUE_MAXIMOS);
 		InputStream inputStream = plantillaArcelor.getInputStream();
 		Workbook workbook = WorkbookFactory.create(inputStream);
-		Sheet sheet = workbook.getSheetAt(1);
+		Sheet sheet = workbook.getSheetAt(0);
 		var cabecerasRowPos = -1;
 		var cabecerasColPos = -1;
 		var destinatarioColPos = -1;
@@ -703,53 +716,26 @@ public class ExcelHelper {
 		var panel2col1 = 0;
 		var panel2row1 = 65;
 		//
-		HSSFPatriarch pat = (HSSFPatriarch) sheet.getDrawingPatriarch();
-
+		XSSFDrawing pat = (XSSFDrawing) sheet.getDrawingPatriarch();
 		if (!isPrimerBloque) {
-			int lineStyleColor = 0;
-			HSSFRichTextString panel1RichString = new HSSFRichTextString(StringUtils.EMPTY);
-			HSSFRichTextString panel2RichString = new HSSFRichTextString(StringUtils.EMPTY);
-			for (HSSFShape shape : pat.getChildren()) {
-				var clienteAnchor = (HSSFClientAnchor) shape.getAnchor();
-				if (shape instanceof HSSFTextbox) {
-					HSSFTextbox textbox = (HSSFTextbox) shape;
-					HSSFRichTextString richString = textbox.getString();
-					lineStyleColor = textbox.getLineStyleColor();
-					String contenidoString = richString.getString();
-					if (panel1col1 == clienteAnchor.getCol1() && panel1row1 == clienteAnchor.getRow1()) {
-						panel1RichString = new HSSFRichTextString(contenidoString);
-						panel1RichString.applyFont(richString.getFontAtIndex(0));
+			XSSFShape panel1Shape = null;
+			XSSFShape panel2Shape = null;
+			for (XSSFShape shape : pat.getShapes()) {
+				if (shape instanceof XSSFSimpleShape) {
+					XSSFClientAnchor anchor = (XSSFClientAnchor) shape.getAnchor();
+					if (anchor.getCol1() == panel1col1 && anchor.getRow1() == panel1row1) {
+						panel1Shape = shape;
 					}
-					if (panel2col1 == clienteAnchor.getCol1() && panel2row1 == clienteAnchor.getRow1()) {
-						panel2RichString = new HSSFRichTextString(contenidoString);
-
-						var stringSplit = StringUtils.split(contenidoString);
-						for (String s : stringSplit) {
-							int startIndex = contenidoString.indexOf(s);
-							int endIndex = startIndex + s.length();
-							panel2RichString.applyFont(startIndex, endIndex, richString.getFontAtIndex(0));
-						}
+					if (anchor.getCol1() == panel2col1 && anchor.getRow1() == panel2row1) {
+						panel2Shape = shape;
 					}
-
 				}
 			}
-			HSSFTextbox shapePanel1 = pat.createTextbox(new HSSFClientAnchor(0, 25, 0, 0, (short) 1, pointerStartHeader,
-					(short) 23, pointerStartHeader + 8));
-			shapePanel1.setLineStyleColor(lineStyleColor);
-			shapePanel1.setString(panel1RichString);
-			shapePanel1.setMarginTop(MARGIN_PANELES_TEXT);
-			shapePanel1.setMarginBottom(MARGIN_PANELES_TEXT);
-			shapePanel1.setMarginLeft(MARGIN_PANELES_TEXT);
-			shapePanel1.setMarginRight(MARGIN_PANELES_TEXT);
+			copySimpleShape(panel1Shape, (XSSFSheet) sheet, pat, -1, 21, pointerStartHeader, pointerStartHeader + 8,
+					true);
 			pointerStartHeader += 8;
-			HSSFTextbox shapePanel2 = pat.createTextbox(new HSSFClientAnchor(0, 20, 0, 0, (short) 1, pointerStartHeader,
-					(short) 23, pointerStartHeader + 6));
-			shapePanel2.setLineStyleColor(lineStyleColor);
-			shapePanel2.setString(panel2RichString);
-			shapePanel2.setMarginTop(MARGIN_PANELES_TEXT);
-			shapePanel2.setMarginBottom(MARGIN_PANELES_TEXT);
-			shapePanel2.setMarginLeft(MARGIN_PANELES_TEXT);
-			shapePanel2.setMarginRight(MARGIN_PANELES_TEXT);
+			copySimpleShape(panel2Shape, (XSSFSheet) sheet, pat, -1, 21, pointerStartHeader, pointerStartHeader + 6,
+					true);
 		}
 
 	}
@@ -758,124 +744,183 @@ public class ExcelHelper {
 			BobinasTemplate bobinasTemplate, final int pointerRowPos, boolean isPrimerBloque) {
 		var pointerStartHeader = pointerRowPos - ARCELOR_BLOQUE_HEADER_SIZE - 1;
 		var fechaHoy = utilidades.obtenerFechaString(Calendar.getInstance().getTime(), "dd/MM/yy");
-		Font fontDatosInsert = workbook.createFont();
-		fontDatosInsert.setFontName("Calibri");
-		fontDatosInsert.setFontHeightInPoints((short) 9);
-		fontDatosInsert.setBold(true);
+		XSSFFont font = (XSSFFont) workbook.createFont();
 		//
-		var panel1col1 = 12;
-		var panel1row1 = 0;
-		var panel2col1 = 0;
-		var panel2row1 = 4;
-		var panel3col1 = 0;
-		var panel3row1 = 8;
+		var panel1col1 = 1;
+		var panel1row1 = 3;
+		var panel2col1 = 1;
+		var panel2row1 = 7;
 		//
-		HSSFPatriarch pat = (HSSFPatriarch) sheet.getDrawingPatriarch();
+		XSSFDrawing pat = (XSSFDrawing) sheet.getDrawingPatriarch();
+		if (isPrimerBloque) {
+			for (XSSFShape shape : pat.getShapes()) {
+				if (shape instanceof XSSFSimpleShape) {
+					XSSFSimpleShape simpleShape = (XSSFSimpleShape) shape;
+					String text = simpleShape.getText();
+					if (StringUtils.contains(text, VAR_VESSEL)) {
+						XSSFRichTextString richText = new XSSFRichTextString();
+						List<XSSFTextParagraph> textParagraphs = simpleShape.getTextParagraphs();
+						for (XSSFTextParagraph textParagraph : textParagraphs) {
+							for (XSSFTextRun xssfTextRun : textParagraph.getTextRuns()) {
+								String textRun = xssfTextRun.getText();
+								font.setFontName(xssfTextRun.getFontFamily());
+								font.setFontHeight(xssfTextRun.getFontSize());
+								font.setBold(xssfTextRun.isBold());
+								if (textRun.contains(VAR_VESSEL)) {
+									richText.append(
+											StringUtils.replace(textRun, VAR_VESSEL, bobinasTemplate.getBarco()), font);
+								} else if (textRun.contains(VAR_FECHA)) {
+									richText.append(StringUtils.replace(textRun, VAR_FECHA, fechaHoy), font);
+								} else {
+									richText.append(textRun, font);
+								}
+							}
+							richText.append(StringUtils.LF);
+						}
+						simpleShape.setText(richText);
+					}
+				}
+			}
+		}
 		if (!isPrimerBloque) {
-			int pictureIndex = -1;
-			for (HSSFShape shape : pat.getChildren()) {
-				if (shape instanceof HSSFPicture) {
-					HSSFPicture picture = (HSSFPicture) shape;
-					pictureIndex = picture.getPictureIndex();
+			for (XSSFShape shape : pat.getShapes()) {
+				if (shape instanceof XSSFPicture) {
+					copyPicture(shape, (XSSFSheet) sheet, pat, -1, -1, pointerStartHeader, pointerStartHeader + 3);
 					break;
 				}
 			}
-			HSSFPicture shapePicture = pat.createPicture(
-					new HSSFClientAnchor(0, 0, 0, 0, (short) 1, pointerStartHeader, (short) 2, pointerStartHeader + 4),
-					pictureIndex);
-			shapePicture.resize(1.0, 1.0);
-			int lineStyleColor = 0;
-			HSSFRichTextString panel1RichString = new HSSFRichTextString(StringUtils.EMPTY);
-			HSSFRichTextString panel2RichString = new HSSFRichTextString(StringUtils.EMPTY);
-			HSSFRichTextString panel3RichString = new HSSFRichTextString(StringUtils.EMPTY);
-			for (HSSFShape shape : pat.getChildren()) {
-				var clienteAnchor = (HSSFClientAnchor) shape.getAnchor();
-				if (shape instanceof HSSFTextbox) {
-					HSSFTextbox textbox = (HSSFTextbox) shape;
-					HSSFRichTextString richString = textbox.getString();
-					lineStyleColor = textbox.getLineStyleColor();
-					if (panel1col1 == clienteAnchor.getCol1() && panel1row1 == clienteAnchor.getRow1()) {
-						var s = richString.getString();
-						panel1RichString = new HSSFRichTextString(richString.getString());
-						panel1RichString.applyFont(richString.getFontOfFormattingRun(0));
-						panel1RichString.applyFont(s.indexOf("HI"), s.length(), richString.getFontOfFormattingRun(1));
+			XSSFShape panel1Shape = null;
+			XSSFShape panel2Shape = null;
+			for (XSSFShape shape : pat.getShapes()) {
+				if (shape instanceof XSSFSimpleShape) {
+					XSSFClientAnchor anchor = (XSSFClientAnchor) shape.getAnchor();
+					if (anchor.getCol1() == panel1col1 && anchor.getRow1() == panel1row1) {
+						panel1Shape = shape;
 					}
-					// datos barco fecha
-					if (panel2col1 == clienteAnchor.getCol1() && panel2row1 == clienteAnchor.getRow1()) {
-						var s = richString.getString();
-						panel2RichString = new HSSFRichTextString(richString.getString());
-						panel2RichString.applyFont(richString.getFontAtIndex(0));
-						int startIndex = s.indexOf(fechaHoy);
-						int endIndex = startIndex + fechaHoy.length();
-						panel2RichString.applyFont(startIndex, endIndex, richString.getFontOfFormattingRun(1));
-						startIndex = s.indexOf(bobinasTemplate.getBarco());
-						endIndex = startIndex + bobinasTemplate.getBarco().length();
-						panel2RichString.applyFont(startIndex, endIndex, richString.getFontOfFormattingRun(1));
-					}
-					if (panel3col1 == clienteAnchor.getCol1() && panel3row1 == clienteAnchor.getRow1()) {
-						panel3RichString = new HSSFRichTextString(richString.getString());
-						panel3RichString.applyFont(richString.getFontAtIndex(0));
+					if (anchor.getCol1() == panel2col1 && anchor.getRow1() == panel2row1) {
+						panel2Shape = shape;
 					}
 				}
 			}
-			HSSFTextbox shapePanel1 = pat.createTextbox(new HSSFClientAnchor(0, 0, 0, 0, (short) panel1col1,
-					pointerStartHeader, (short) (panel1col1 + 11), pointerStartHeader + 4));
-			shapePanel1.setLineStyleColor(lineStyleColor);
-			shapePanel1.setString(panel1RichString);
-			shapePanel1.setMarginTop(MARGIN_PANELES_TEXT);
-			shapePanel1.setMarginBottom(MARGIN_PANELES_TEXT);
-			shapePanel1.setMarginLeft(MARGIN_PANELES_TEXT);
-			shapePanel1.setMarginRight(MARGIN_PANELES_TEXT);
+			pointerStartHeader += 3;
+			copySimpleShape(panel1Shape, (XSSFSheet) sheet, pat, -1, -1, pointerStartHeader, pointerStartHeader + 4,
+					true);
 			pointerStartHeader += 4;
-			HSSFTextbox shapePanel2 = pat.createTextbox(new HSSFClientAnchor(0, 20, 0, 0, (short) 1, pointerStartHeader,
-					(short) 5, pointerStartHeader + 4));
-			shapePanel2.setLineStyleColor(lineStyleColor);
-			shapePanel2.setString(panel2RichString);
-			shapePanel2.setMarginTop(MARGIN_PANELES_TEXT);
-			shapePanel2.setMarginBottom(MARGIN_PANELES_TEXT);
-			shapePanel2.setMarginLeft(MARGIN_PANELES_TEXT);
-			shapePanel2.setMarginRight(MARGIN_PANELES_TEXT);
-
-			pointerStartHeader += 4;
-			HSSFTextbox shapePanel3 = pat.createTextbox(new HSSFClientAnchor(0, 15, 0, 200, (short) 1,
-					pointerStartHeader, (short) 5, pointerStartHeader + 4));
-			shapePanel3.setLineStyleColor(lineStyleColor);
-			shapePanel3.setString(panel3RichString);
-			shapePanel3.setMarginTop(MARGIN_PANELES_TEXT);
-			shapePanel3.setMarginBottom(MARGIN_PANELES_TEXT);
-			shapePanel3.setMarginLeft(MARGIN_PANELES_TEXT);
-			shapePanel3.setMarginRight(MARGIN_PANELES_TEXT);
-
+			copySimpleShape(panel2Shape, (XSSFSheet) sheet, pat, -1, -1, pointerStartHeader, pointerStartHeader + 5,
+					true);
 		}
-		if (isPrimerBloque) {
-			for (HSSFShape shape : pat.getChildren()) {
-				if (shape instanceof HSSFTextbox) {
-					HSSFTextbox textbox = (HSSFTextbox) shape;
-					textbox.setMarginBottom(MARGIN_PANELES_TEXT);
-					textbox.setMarginTop(MARGIN_PANELES_TEXT);
-					textbox.setMarginRight(MARGIN_PANELES_TEXT);
-					textbox.setMarginLeft(MARGIN_PANELES_TEXT);
-					HSSFRichTextString richString = textbox.getString();
-					String str = richString.getString();
-					if (str.contains(VAR_VESSEL) && str.contains(VAR_FECHA)) {
-						var strUpdate = StringUtils.replace(str, VAR_VESSEL, bobinasTemplate.getBarco());
-						strUpdate = StringUtils.replace(strUpdate, VAR_FECHA, fechaHoy);
-						// update
-						HSSFRichTextString stringRichUpdate = new HSSFRichTextString(strUpdate);
-						stringRichUpdate.applyFont(richString.getFontAtIndex(0));
 
-						int startIndex = strUpdate.indexOf(fechaHoy);
-						int endIndex = startIndex + fechaHoy.length();
-						stringRichUpdate.applyFont(startIndex, endIndex, fontDatosInsert);
-						startIndex = strUpdate.indexOf(bobinasTemplate.getBarco());
-						endIndex = startIndex + bobinasTemplate.getBarco().length();
-						stringRichUpdate.applyFont(startIndex, endIndex, fontDatosInsert);
-						textbox.setString(stringRichUpdate);
+	}
 
-					}
+	private static void copySimpleShape(XSSFShape shape, XSSFSheet sheet, XSSFDrawing pat, int col1, int col2, int row1,
+			int row2, boolean copyChoord) {
+		XSSFSimpleShape simpleShape = (XSSFSimpleShape) shape;
+		XSSFClientAnchor anchor = (XSSFClientAnchor) shape.getAnchor();
+
+		XSSFWorkbook wb = sheet.getWorkbook();
+		XSSFCreationHelper newHelper = wb.getCreationHelper();
+		XSSFClientAnchor newAnchor = newHelper.createClientAnchor();
+		// Row / Column placement.
+		if (col1 == -1) {
+			newAnchor.setCol1(anchor.getCol1());
+		} else {
+			newAnchor.setCol1(col1);
+		}
+		if (col2 == -1) {
+			newAnchor.setCol2(anchor.getCol2());
+		} else {
+			newAnchor.setCol2(col2);
+		}
+		newAnchor.setRow1(row1);
+		newAnchor.setRow2(row2);
+
+		// Fine touch adjustment along the XY coordinate.
+		if (copyChoord) {
+			newAnchor.setDx1(anchor.getDx1());
+			newAnchor.setDx2(anchor.getDx2());
+			newAnchor.setDy1(anchor.getDy1());
+			newAnchor.setDy2(anchor.getDy2());
+		}
+		var isUnderline = false;
+		var underLineList = new ArrayList<String>();
+		XSSFFont font = (XSSFFont) sheet.getWorkbook().createFont();
+		XSSFRichTextString richText = new XSSFRichTextString();
+		List<XSSFTextParagraph> textParagraphs = simpleShape.getTextParagraphs();
+		for (XSSFTextParagraph textParagraph : textParagraphs) {
+			for (XSSFTextRun xssfTextRun : textParagraph.getTextRuns()) {
+				String textRun = xssfTextRun.getText();
+				font.setFontName(xssfTextRun.getFontFamily());
+				font.setFontHeight(xssfTextRun.getFontSize());
+				font.setBold(xssfTextRun.isBold());
+				if (xssfTextRun.isUnderline()) {
+					isUnderline = true;
+					underLineList.add(StringUtils.trim(textRun));
+					richText.append(textRun);
+				} else {
+					richText.append(textRun, font);
 				}
 			}
+			richText.append(StringUtils.LF);
 		}
+		if (isUnderline) {
+			font.setUnderline(XSSFFont.U_SINGLE);
+			for (var s : underLineList) {
+				int iStarts = richText.getString().indexOf(s);
+				int iEnds = iStarts + s.length();
+				richText.applyFont(iStarts, iEnds, font);
+			}
+		}
+		XSSFSimpleShape simpleShapeCreated = pat.createSimpleShape(newAnchor);
+		simpleShapeCreated.setText(richText);
+		CTShape ctShape = simpleShape.getCTShape();
+		CTShapeProperties ctShapeProperties = ctShape.getSpPr();
+		// background
+		simpleShapeCreated.getCTShape().getSpPr().setSolidFill(ctShapeProperties.getSolidFill());
+		// borde
+		simpleShapeCreated.getCTShape().getSpPr().setLn(ctShapeProperties.getLn());
+		;
+
+	}
+
+	private static void copyPicture(XSSFShape shape, XSSFSheet sheet, XSSFDrawing pat, int col1, int col2, int row1,
+			int row2) {
+		XSSFPicture picture = (XSSFPicture) shape;
+
+		XSSFPictureData xssfPictureData = picture.getPictureData();
+		XSSFClientAnchor anchor = (XSSFClientAnchor) shape.getAnchor();
+
+		int x1 = anchor.getDx1();
+		int x2 = anchor.getDx2();
+		int y1 = anchor.getDy1();
+		int y2 = anchor.getDy2();
+
+		XSSFWorkbook wb = sheet.getWorkbook();
+		XSSFCreationHelper newHelper = wb.getCreationHelper();
+		XSSFClientAnchor newAnchor = newHelper.createClientAnchor();
+
+		// Row / Column placement.
+		if (col1 == -1) {
+			newAnchor.setCol1(anchor.getCol1());
+		} else {
+			newAnchor.setCol1(col1);
+		}
+		if (col2 == -1) {
+			newAnchor.setCol2(anchor.getCol2());
+		} else {
+			newAnchor.setCol2(col2);
+		}
+		newAnchor.setRow1(row1);
+		newAnchor.setRow2(row2);
+
+		// Fine touch adjustment along the XY coordinate.
+		newAnchor.setDx1(x1);
+		newAnchor.setDx2(x2);
+		newAnchor.setDy1(y1);
+		newAnchor.setDy2(y2);
+
+		int newPictureIndex = wb.addPicture(xssfPictureData.getData(), xssfPictureData.getPictureType());
+
+		XSSFPicture newPicture = pat.createPicture(newAnchor, newPictureIndex);
 	}
 
 }
