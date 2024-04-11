@@ -2,13 +2,14 @@ package com.puerto.bobinas.informes.helpers;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.text.DecimalFormat;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -24,6 +25,12 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.commons.lang3.time.DateUtils;
+import org.apache.poi.hssf.usermodel.HSSFClientAnchor;
+import org.apache.poi.hssf.usermodel.HSSFPatriarch;
+import org.apache.poi.hssf.usermodel.HSSFPicture;
+import org.apache.poi.hssf.usermodel.HSSFRichTextString;
+import org.apache.poi.hssf.usermodel.HSSFShape;
+import org.apache.poi.hssf.usermodel.HSSFTextbox;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.CellType;
@@ -54,6 +61,28 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 @Slf4j
 public class ExcelHelper {
+
+	private static final String VAR_CAB = "VAR_CAB";
+
+	private static final String VAR_PESO_BRUTO = "VAR_PESO_BRUTO";
+
+	private static final String VAR_NUM_SERIE = "VAR_NUM_SERIE";
+
+	private static final String VAR_POSITION = "VAR_POSITION";
+
+	private static final String VAR_DESTINATARIO = "VAR_DESTINATARIO";
+
+	private static final String VAR_VESSEL = "VAR_VESSEL";
+
+	private static final String VAR_FECHA = "VAR_FECHA";
+
+	private static final int ARCELOR_BLOQUE_HEADER_SIZE = 13;
+
+	private static final int ARCELOR_BLOQUE_FOOTER_SIZE = 15;
+
+	private static final int ARCELOR_BLOQUE_MAXIMOS = 43;
+
+	private static final int MARGIN_PANELES_TEXT = 20160;
 
 	@Autowired
 	private Utilidades utilidades;
@@ -232,134 +261,254 @@ public class ExcelHelper {
 
 	public Path obtenerPlantillaSalida(BobinasTemplate bobinasTemplate) {
 		try {
-			var bobinas = bobinasTemplate.getBobinasList();
-			var clienteEnum = ClientesEnum.getClienteEnum(bobinasTemplate.getCliente());
-			Map<String, List<Bobina>> bobinasMap = obtenerBobinasMap(bobinas);
-			var fechaHoy = utilidades.obtenerFechaString(Calendar.getInstance().getTime(), "dd/MM/yyyy");
-			InputStream inputStream = null;
-			switch (clienteEnum) {
-			case THYSSEN:
-				inputStream = plantillaThyssen.getInputStream();
-				break;
-			default:
-				inputStream = plantillaArcelor.getInputStream();
-				break;
-			}
-			Workbook workbook = WorkbookFactory.create(inputStream);
-			workbook.setSheetName(0, "Informe");
-			Sheet sheet = workbook.getSheetAt(0);
-			var destinatarioRowPos = -1;
-			var destinatarioColPos = -1;
-			var positionColPos = -1;
-			var numSerieColPos = -1;
-			var pesoBrutoColPos = -1;
-			var bobinaRowPos = -1;
-			Iterator<Row> rowIterator = sheet.iterator();
-			while (rowIterator.hasNext()) {
-				Row row = rowIterator.next();
-
-				Iterator<Cell> cellIterator = row.cellIterator();
-				while (cellIterator.hasNext()) {
-					Cell cell = cellIterator.next();
-					int columnIndex = cell.getColumnIndex();
-					int rowIndex = cell.getRowIndex();
-					switch (cell.getCellType()) {
-					case STRING:
-						String stringCellValue = cell.getStringCellValue();
-						if ("VAR_FECHA".equals(stringCellValue)) {
-							cell.setCellValue(DateUtils.parseDate(fechaHoy, "dd/MM/yyyy"));
-						}
-						if ("VAR_DESTINATARIO".equals(stringCellValue)) {
-							destinatarioRowPos = rowIndex;
-							destinatarioColPos = columnIndex;
-						}
-						if ("VAR_POSITION".equals(stringCellValue)) {
-							bobinaRowPos = rowIndex;
-							positionColPos = columnIndex;
-						}
-						if ("VAR_NUM_SERIE".equals(stringCellValue)) {
-							bobinaRowPos = rowIndex;
-							numSerieColPos = columnIndex;
-						}
-						if ("VAR_PESO_BRUTO".equals(stringCellValue)) {
-							bobinaRowPos = rowIndex;
-							pesoBrutoColPos = columnIndex;
-						}
-						if ("VAR_VESSEL".equals(stringCellValue)) {
-							cell.setCellValue(bobinasTemplate.getBarco());
-						}
-						break;
-					default:
-						break;
-					}
-				}
-			}
-			Row rowOrigenBobina = sheet.getRow(bobinaRowPos);
-			Row rowOrigenDest = sheet.getRow(destinatarioRowPos);
-			var controlUltimoRegistro = bobinasMap.size();
-			for (Map.Entry<String, List<Bobina>> bobinaMap : bobinasMap.entrySet()) {
-				controlUltimoRegistro--;
-				var destinatarioString = bobinaMap.getKey();
-				List<Bobina> bobinasVal = bobinaMap.getValue().stream()
-						.sorted(Comparator.comparing(Bobina::getNumSerie)).collect(Collectors.toList());
-				for (var indexBobinas = 0; indexBobinas < bobinasVal.size(); indexBobinas++) {
-					Bobina bobina = bobinasVal.get(indexBobinas);
-					if (indexBobinas != bobinasVal.size() - 1) {
-						Row rowBobina = sheet.createRow(bobinaRowPos + 1);
-						copiarFormatoRowByCell(rowOrigenBobina, rowBobina, false, null, 0, 0);
-					}
-					sheet.getRow(bobinaRowPos).getCell(positionColPos).setCellValue(indexBobinas + 1);
-					sheet.getRow(bobinaRowPos).getCell(numSerieColPos).setCellValue(bobina.getNumSerie());
-					sheet.getRow(bobinaRowPos).getCell(pesoBrutoColPos).setCellValue(bobina.getPesoBrutoPrevisto());
-					bobinaRowPos++;
-				}
-				if (controlUltimoRegistro != 0) {
-					Row rowDestinatario = sheet.createRow(bobinaRowPos);
-					copiarFormatoRowByCell(rowOrigenDest, rowDestinatario, true, sheet, 0, 2);
-					sheet.getRow(destinatarioRowPos).getCell(destinatarioColPos).setCellValue(destinatarioString);
-					destinatarioRowPos = rowDestinatario.getRowNum();
-					// ultima linea tiene que ser row bobina vacia
-					Row rowBobina = sheet.createRow(++bobinaRowPos);
-					copiarFormatoRowByCell(rowOrigenBobina, rowBobina, false, null, 0, 0);
-				}
-				if (controlUltimoRegistro == 0) {
-					sheet.getRow(destinatarioRowPos).getCell(destinatarioColPos).setCellValue(destinatarioString);
-				}
-			}
-			generarPiePagina(workbook, sheet, bobinaRowPos);
-			inputStream.close();
-
 			if (utilidades.crearDirectorio(salidaDirectory)) {
 				log.info("Directorio {} creado", salidaDirectory);
 			}
-			Path salidaDirectoryPath = Paths.get(salidaDirectory);
-			var salidaGeneradaPath = new StringBuilder();
-			if (Files.notExists(salidaDirectoryPath)) {
-				salidaGeneradaPath.append(rootDirectory);
-			} else {
-				salidaGeneradaPath.append(salidaDirectory);
+			var bobinas = bobinasTemplate.getBobinasList();
+			var clienteEnum = ClientesEnum.getClienteEnum(bobinasTemplate.getCliente());
+			switch (clienteEnum) {
+			case THYSSEN:
+				return obtenerPlantillaThyssen(bobinasTemplate, bobinas);
+			default:
+				return obtenerPlantillaArcelor(bobinasTemplate, bobinas);
 			}
-			salidaGeneradaPath.append("/");
-			salidaGeneradaPath.append("REPORT");
-			salidaGeneradaPath.append(StringUtils.SPACE);
-			salidaGeneradaPath.append("MUELLE");
-			salidaGeneradaPath.append(StringUtils.SPACE);
-			salidaGeneradaPath.append(bobinasTemplate.getBarco());
-			salidaGeneradaPath.append(".xlsx");
-			FileOutputStream outputStream = new FileOutputStream(salidaGeneradaPath.toString());
-			workbook.write(outputStream);
-			workbook.close();
-			outputStream.close();
-			log.info("Excel creado correctamente: {}", salidaGeneradaPath);
-			Path path = Path.of(salidaGeneradaPath.toString());
-			return path;
 		} catch (Exception ex) {
 			log.error("Error generando plantilla", ex);
 			return Path.of(rootDirectory);
 		}
 	}
 
-	private void generarPiePagina(Workbook wb, Sheet sheet, int bobinaRowPos) throws Exception {
+	private Path obtenerPlantillaArcelor(BobinasTemplate bobinasTemplate, List<Bobina> bobinas)
+			throws IOException, ParseException, Exception, FileNotFoundException {
+		List<Bobina> bobinasList = bobinasTemplate.getBobinasList().stream()
+				.sorted(Comparator.comparing(Bobina::getNombreDestinatario).thenComparing(Bobina::getNumSerie))
+				.collect(Collectors.toList());
+		int bloques = bobinasList.size() % ARCELOR_BLOQUE_MAXIMOS != 0
+				? (bobinasList.size() / ARCELOR_BLOQUE_MAXIMOS) + 1
+				: bobinasList.size() / ARCELOR_BLOQUE_MAXIMOS;
+		Map<Integer, List<Bobina>> bobinasMap = obtenerBobinasMap(bobinasList, bloques, ARCELOR_BLOQUE_MAXIMOS);
+		InputStream inputStream = plantillaArcelor.getInputStream();
+		Workbook workbook = WorkbookFactory.create(inputStream);
+		Sheet sheet = workbook.getSheetAt(1);
+		var cabecerasRowPos = -1;
+		var cabecerasColPos = -1;
+		var destinatarioColPos = -1;
+		var positionColPos = -1;
+		var numSerieColPos = -1;
+		var pesoBrutoColPos = -1;
+		var pointerRowPos = -1;
+		Iterator<Row> rowIterator = sheet.iterator();
+		while (rowIterator.hasNext()) {
+			Row row = rowIterator.next();
+
+			Iterator<Cell> cellIterator = row.cellIterator();
+			while (cellIterator.hasNext()) {
+				Cell cell = cellIterator.next();
+				int columnIndex = cell.getColumnIndex();
+				int rowIndex = cell.getRowIndex();
+				switch (cell.getCellType()) {
+				case STRING:
+					String stringCellValue = cell.getStringCellValue();
+					if (VAR_CAB.equals(stringCellValue)) {
+						cabecerasRowPos = rowIndex;
+						cabecerasColPos = columnIndex;
+					}
+					if (VAR_POSITION.equals(stringCellValue)) {
+						pointerRowPos = rowIndex;
+						positionColPos = columnIndex;
+					}
+					if (VAR_DESTINATARIO.equals(stringCellValue)) {
+						destinatarioColPos = columnIndex;
+					}
+					if (VAR_NUM_SERIE.equals(stringCellValue)) {
+						numSerieColPos = columnIndex;
+					}
+					if (VAR_PESO_BRUTO.equals(stringCellValue)) {
+						pesoBrutoColPos = columnIndex;
+					}
+					break;
+				default:
+					break;
+				}
+			}
+		}
+
+		Row rowOrigenBobina = sheet.getRow(pointerRowPos);
+		Row rowOrigenCabeceras = sheet.getRow(cabecerasRowPos);
+		var controlUltimoRegistro = bobinasMap.size();
+		var controlRegistros = 0;
+		for (Map.Entry<Integer, List<Bobina>> bobinaMap : bobinasMap.entrySet()) {
+			// header
+			var isPrimerBloque = bobinaMap.getKey().intValue() == 0;
+			generarCabeceraBloqueArcelor(workbook, sheet, bobinasTemplate, pointerRowPos, isPrimerBloque);
+			controlUltimoRegistro--;
+			var cabecerasIndexString = StringUtils.EMPTY;
+			for (var indexBobinas = 0; indexBobinas < bobinaMap.getValue().size(); indexBobinas++) {
+				controlRegistros++;
+				Bobina bobina = bobinaMap.getValue().get(indexBobinas);
+				if (indexBobinas != bobinaMap.getValue().size() - 1) {
+					Row rowBobina = sheet.createRow(pointerRowPos + 1);
+					copiarFormatoRowByCell(rowOrigenBobina, rowBobina, false, null, 0, 0);
+				}
+				sheet.getRow(pointerRowPos).getCell(positionColPos).setCellValue(controlRegistros);
+				sheet.getRow(pointerRowPos).getCell(destinatarioColPos).setCellValue(bobina.getNombreDestinatario());
+				sheet.getRow(pointerRowPos).getCell(numSerieColPos).setCellValue(bobina.getNumSerie());
+				sheet.getRow(pointerRowPos).getCell(pesoBrutoColPos).setCellValue(bobina.getPesoBrutoPrevisto());
+				pointerRowPos++;
+			}
+			if (bobinaMap.getValue().size() != ARCELOR_BLOQUE_MAXIMOS) {
+				for (var k = 0; k <= ARCELOR_BLOQUE_MAXIMOS - bobinaMap.getValue().size(); k++) {
+					Row rowVacio = sheet.createRow(pointerRowPos);
+					copiarFormatoRowByCell(rowOrigenBobina, rowVacio, false, null, 0, 0);
+					pointerRowPos++;
+				}
+			}
+			generarPieBloqueArcelor(workbook, sheet, pointerRowPos, isPrimerBloque);
+			if (controlUltimoRegistro != 0) {
+				pointerRowPos += ARCELOR_BLOQUE_HEADER_SIZE + ARCELOR_BLOQUE_FOOTER_SIZE;
+				Row rowCabecera = sheet.createRow(pointerRowPos);
+				copiarFormatoRowByCell(rowOrigenCabeceras, rowCabecera, false, sheet, 0, 0);
+				copiarContenidoRowByCell(rowOrigenCabeceras, rowCabecera);
+				sheet.getRow(cabecerasRowPos).getCell(cabecerasColPos).setCellValue(cabecerasIndexString);
+				cabecerasRowPos = rowCabecera.getRowNum();
+				// ultima linea tiene que ser row bobina vacia
+				Row rowBobina = sheet.createRow(++pointerRowPos);
+				copiarFormatoRowByCell(rowOrigenBobina, rowBobina, false, null, 0, 0);
+			}
+			if (controlUltimoRegistro == 0) {
+				sheet.getRow(cabecerasRowPos).getCell(cabecerasColPos).setCellValue(cabecerasIndexString);
+			}
+		}
+
+		inputStream.close();
+
+		var salidaGeneradaPath = new StringBuilder();
+		salidaGeneradaPath.append(salidaDirectory);
+		salidaGeneradaPath.append("/");
+		salidaGeneradaPath.append("REPORT");
+		salidaGeneradaPath.append(StringUtils.SPACE);
+		salidaGeneradaPath.append("MUELLE");
+		salidaGeneradaPath.append(StringUtils.SPACE);
+		salidaGeneradaPath.append(bobinasTemplate.getBarco());
+		salidaGeneradaPath.append(".xlsx");
+		FileOutputStream outputStream = new FileOutputStream(salidaGeneradaPath.toString());
+		workbook.write(outputStream);
+		workbook.close();
+		outputStream.close();
+		log.info("Excel creado correctamente: {}", salidaGeneradaPath);
+		Path path = Path.of(salidaGeneradaPath.toString());
+		return path;
+
+	}
+
+	private Path obtenerPlantillaThyssen(BobinasTemplate bobinasTemplate, List<Bobina> bobinas)
+			throws IOException, ParseException, Exception, FileNotFoundException {
+		Map<String, List<Bobina>> bobinasMap = obtenerBobinasMap(bobinas);
+		var fechaHoy = utilidades.obtenerFechaString(Calendar.getInstance().getTime(), "dd/MM/yyyy");
+		InputStream inputStream = plantillaThyssen.getInputStream();
+		Workbook workbook = WorkbookFactory.create(inputStream);
+		workbook.setSheetName(0, "Informe");
+		Sheet sheet = workbook.getSheetAt(0);
+		var destinatarioRowPos = -1;
+		var destinatarioColPos = -1;
+		var positionColPos = -1;
+		var numSerieColPos = -1;
+		var pesoBrutoColPos = -1;
+		var bobinaRowPos = -1;
+		Iterator<Row> rowIterator = sheet.iterator();
+		while (rowIterator.hasNext()) {
+			Row row = rowIterator.next();
+
+			Iterator<Cell> cellIterator = row.cellIterator();
+			while (cellIterator.hasNext()) {
+				Cell cell = cellIterator.next();
+				int columnIndex = cell.getColumnIndex();
+				int rowIndex = cell.getRowIndex();
+				switch (cell.getCellType()) {
+				case STRING:
+					String stringCellValue = cell.getStringCellValue();
+					if (VAR_FECHA.equals(stringCellValue)) {
+						cell.setCellValue(DateUtils.parseDate(fechaHoy, "dd/MM/yyyy"));
+					}
+					if (VAR_DESTINATARIO.equals(stringCellValue)) {
+						destinatarioRowPos = rowIndex;
+						destinatarioColPos = columnIndex;
+					}
+					if (VAR_POSITION.equals(stringCellValue)) {
+						bobinaRowPos = rowIndex;
+						positionColPos = columnIndex;
+					}
+					if (VAR_NUM_SERIE.equals(stringCellValue)) {
+						bobinaRowPos = rowIndex;
+						numSerieColPos = columnIndex;
+					}
+					if (VAR_PESO_BRUTO.equals(stringCellValue)) {
+						bobinaRowPos = rowIndex;
+						pesoBrutoColPos = columnIndex;
+					}
+					if (VAR_VESSEL.equals(stringCellValue)) {
+						cell.setCellValue(bobinasTemplate.getBarco());
+					}
+					break;
+				default:
+					break;
+				}
+			}
+		}
+		Row rowOrigenBobina = sheet.getRow(bobinaRowPos);
+		Row rowOrigenDest = sheet.getRow(destinatarioRowPos);
+		var controlUltimoRegistro = bobinasMap.size();
+		for (Map.Entry<String, List<Bobina>> bobinaMap : bobinasMap.entrySet()) {
+			controlUltimoRegistro--;
+			var destinatarioString = bobinaMap.getKey();
+			List<Bobina> bobinasVal = bobinaMap.getValue().stream().sorted(Comparator.comparing(Bobina::getNumSerie))
+					.collect(Collectors.toList());
+			for (var indexBobinas = 0; indexBobinas < bobinasVal.size(); indexBobinas++) {
+				Bobina bobina = bobinasVal.get(indexBobinas);
+				if (indexBobinas != bobinasVal.size() - 1) {
+					Row rowBobina = sheet.createRow(bobinaRowPos + 1);
+					copiarFormatoRowByCell(rowOrigenBobina, rowBobina, false, null, 0, 0);
+				}
+				sheet.getRow(bobinaRowPos).getCell(positionColPos).setCellValue(indexBobinas + 1);
+				sheet.getRow(bobinaRowPos).getCell(numSerieColPos).setCellValue(bobina.getNumSerie());
+				sheet.getRow(bobinaRowPos).getCell(pesoBrutoColPos).setCellValue(bobina.getPesoBrutoPrevisto());
+				bobinaRowPos++;
+			}
+			if (controlUltimoRegistro != 0) {
+				Row rowDestinatario = sheet.createRow(bobinaRowPos);
+				copiarFormatoRowByCell(rowOrigenDest, rowDestinatario, true, sheet, 0, 2);
+				sheet.getRow(destinatarioRowPos).getCell(destinatarioColPos).setCellValue(destinatarioString);
+				destinatarioRowPos = rowDestinatario.getRowNum();
+				// ultima linea tiene que ser row bobina vacia
+				Row rowBobina = sheet.createRow(++bobinaRowPos);
+				copiarFormatoRowByCell(rowOrigenBobina, rowBobina, false, null, 0, 0);
+			}
+			if (controlUltimoRegistro == 0) {
+				sheet.getRow(destinatarioRowPos).getCell(destinatarioColPos).setCellValue(destinatarioString);
+			}
+		}
+		generarPiePaginaThyssen(workbook, sheet, bobinaRowPos);
+		inputStream.close();
+
+		var salidaGeneradaPath = new StringBuilder();
+		salidaGeneradaPath.append(salidaDirectory);
+		salidaGeneradaPath.append("/");
+		salidaGeneradaPath.append("REPORT");
+		salidaGeneradaPath.append(StringUtils.SPACE);
+		salidaGeneradaPath.append("MUELLE");
+		salidaGeneradaPath.append(StringUtils.SPACE);
+		salidaGeneradaPath.append(bobinasTemplate.getBarco());
+		salidaGeneradaPath.append(".xlsx");
+		FileOutputStream outputStream = new FileOutputStream(salidaGeneradaPath.toString());
+		workbook.write(outputStream);
+		workbook.close();
+		outputStream.close();
+		log.info("Excel creado correctamente: {}", salidaGeneradaPath);
+		Path path = Path.of(salidaGeneradaPath.toString());
+		return path;
+	}
+
+	private void generarPiePaginaThyssen(Workbook wb, Sheet sheet, int bobinaRowPos) throws Exception {
 		// format danios
 		CellStyle styleDmg = wb.createCellStyle();
 		Font fontDmg = wb.createFont();
@@ -508,6 +657,225 @@ public class ExcelHelper {
 			sheet.addMergedRegion(new CellRangeAddress(rowDestinoPos, rowDestinoPos, mergedStars, mergedEnds));
 		}
 
+	}
+
+	private void copiarContenidoRowByCell(Row rowOrigen, Row rowDestino) {
+		Iterator<Cell> cellIterator = rowOrigen.iterator();
+		var i = 0;
+		while (cellIterator.hasNext()) {
+			Cell cell = cellIterator.next();
+			switch (cell.getCellType()) {
+			case STRING:
+				rowDestino.getCell(i).setCellValue(cell.getStringCellValue());
+				break;
+			case NUMERIC:
+				rowDestino.getCell(i).setCellValue(cell.getNumericCellValue());
+				break;
+			default:
+				rowDestino.getCell(i).setCellValue(StringUtils.EMPTY);
+				break;
+			}
+			i++;
+		}
+
+	}
+
+	private Map<Integer, List<Bobina>> obtenerBobinasMap(List<Bobina> bobinas, int bloques, int bloqueMax) {
+		var bobinasMap = new HashMap<Integer, List<Bobina>>();
+		var bobinasIndex = 0;
+		for (var i = 0; i < bloques; i++) {
+			List<Bobina> bobinasBloque = new ArrayList<Bobina>();
+			for (var j = 0; bobinasIndex < bobinas.size() && j < bloqueMax; j++) {
+				bobinasBloque.add(bobinas.get(bobinasIndex));
+				bobinasIndex++;
+			}
+			bobinasMap.put(i, bobinasBloque);
+		}
+		return new TreeMap<Integer, List<Bobina>>(bobinasMap);
+	}
+
+	private void generarPieBloqueArcelor(final Workbook workbook, final Sheet sheet, final int pointerRowPos,
+			final boolean isPrimerBloque) {
+		//
+		var pointerStartHeader = pointerRowPos;
+		var panel1col1 = 0;
+		var panel1row1 = 57;
+		var panel2col1 = 0;
+		var panel2row1 = 65;
+		//
+		HSSFPatriarch pat = (HSSFPatriarch) sheet.getDrawingPatriarch();
+
+		if (!isPrimerBloque) {
+			int lineStyleColor = 0;
+			HSSFRichTextString panel1RichString = new HSSFRichTextString(StringUtils.EMPTY);
+			HSSFRichTextString panel2RichString = new HSSFRichTextString(StringUtils.EMPTY);
+			for (HSSFShape shape : pat.getChildren()) {
+				var clienteAnchor = (HSSFClientAnchor) shape.getAnchor();
+				if (shape instanceof HSSFTextbox) {
+					HSSFTextbox textbox = (HSSFTextbox) shape;
+					HSSFRichTextString richString = textbox.getString();
+					lineStyleColor = textbox.getLineStyleColor();
+					String contenidoString = richString.getString();
+					if (panel1col1 == clienteAnchor.getCol1() && panel1row1 == clienteAnchor.getRow1()) {
+						panel1RichString = new HSSFRichTextString(contenidoString);
+						panel1RichString.applyFont(richString.getFontAtIndex(0));
+					}
+					if (panel2col1 == clienteAnchor.getCol1() && panel2row1 == clienteAnchor.getRow1()) {
+						panel2RichString = new HSSFRichTextString(contenidoString);
+
+						var stringSplit = StringUtils.split(contenidoString);
+						for (String s : stringSplit) {
+							int startIndex = contenidoString.indexOf(s);
+							int endIndex = startIndex + s.length();
+							panel2RichString.applyFont(startIndex, endIndex, richString.getFontAtIndex(0));
+						}
+					}
+
+				}
+			}
+			HSSFTextbox shapePanel1 = pat.createTextbox(new HSSFClientAnchor(0, 25, 0, 0, (short) 1, pointerStartHeader,
+					(short) 23, pointerStartHeader + 8));
+			shapePanel1.setLineStyleColor(lineStyleColor);
+			shapePanel1.setString(panel1RichString);
+			shapePanel1.setMarginTop(MARGIN_PANELES_TEXT);
+			shapePanel1.setMarginBottom(MARGIN_PANELES_TEXT);
+			shapePanel1.setMarginLeft(MARGIN_PANELES_TEXT);
+			shapePanel1.setMarginRight(MARGIN_PANELES_TEXT);
+			pointerStartHeader += 8;
+			HSSFTextbox shapePanel2 = pat.createTextbox(new HSSFClientAnchor(0, 20, 0, 0, (short) 1, pointerStartHeader,
+					(short) 23, pointerStartHeader + 6));
+			shapePanel2.setLineStyleColor(lineStyleColor);
+			shapePanel2.setString(panel2RichString);
+			shapePanel2.setMarginTop(MARGIN_PANELES_TEXT);
+			shapePanel2.setMarginBottom(MARGIN_PANELES_TEXT);
+			shapePanel2.setMarginLeft(MARGIN_PANELES_TEXT);
+			shapePanel2.setMarginRight(MARGIN_PANELES_TEXT);
+		}
+
+	}
+
+	public void generarCabeceraBloqueArcelor(final Workbook workbook, final Sheet sheet,
+			BobinasTemplate bobinasTemplate, final int pointerRowPos, boolean isPrimerBloque) {
+		var pointerStartHeader = pointerRowPos - ARCELOR_BLOQUE_HEADER_SIZE - 1;
+		var fechaHoy = utilidades.obtenerFechaString(Calendar.getInstance().getTime(), "dd/MM/yy");
+		Font fontDatosInsert = workbook.createFont();
+		fontDatosInsert.setFontName("Calibri");
+		fontDatosInsert.setFontHeightInPoints((short) 9);
+		fontDatosInsert.setBold(true);
+		//
+		var panel1col1 = 12;
+		var panel1row1 = 0;
+		var panel2col1 = 0;
+		var panel2row1 = 4;
+		var panel3col1 = 0;
+		var panel3row1 = 8;
+		//
+		HSSFPatriarch pat = (HSSFPatriarch) sheet.getDrawingPatriarch();
+		if (!isPrimerBloque) {
+			int pictureIndex = -1;
+			for (HSSFShape shape : pat.getChildren()) {
+				if (shape instanceof HSSFPicture) {
+					HSSFPicture picture = (HSSFPicture) shape;
+					pictureIndex = picture.getPictureIndex();
+					break;
+				}
+			}
+			HSSFPicture shapePicture = pat.createPicture(
+					new HSSFClientAnchor(0, 0, 0, 0, (short) 1, pointerStartHeader, (short) 2, pointerStartHeader + 4),
+					pictureIndex);
+			shapePicture.resize(1.0, 1.0);
+			int lineStyleColor = 0;
+			HSSFRichTextString panel1RichString = new HSSFRichTextString(StringUtils.EMPTY);
+			HSSFRichTextString panel2RichString = new HSSFRichTextString(StringUtils.EMPTY);
+			HSSFRichTextString panel3RichString = new HSSFRichTextString(StringUtils.EMPTY);
+			for (HSSFShape shape : pat.getChildren()) {
+				var clienteAnchor = (HSSFClientAnchor) shape.getAnchor();
+				if (shape instanceof HSSFTextbox) {
+					HSSFTextbox textbox = (HSSFTextbox) shape;
+					HSSFRichTextString richString = textbox.getString();
+					lineStyleColor = textbox.getLineStyleColor();
+					if (panel1col1 == clienteAnchor.getCol1() && panel1row1 == clienteAnchor.getRow1()) {
+						var s = richString.getString();
+						panel1RichString = new HSSFRichTextString(richString.getString());
+						panel1RichString.applyFont(richString.getFontOfFormattingRun(0));
+						panel1RichString.applyFont(s.indexOf("HI"), s.length(), richString.getFontOfFormattingRun(1));
+					}
+					// datos barco fecha
+					if (panel2col1 == clienteAnchor.getCol1() && panel2row1 == clienteAnchor.getRow1()) {
+						var s = richString.getString();
+						panel2RichString = new HSSFRichTextString(richString.getString());
+						panel2RichString.applyFont(richString.getFontAtIndex(0));
+						int startIndex = s.indexOf(fechaHoy);
+						int endIndex = startIndex + fechaHoy.length();
+						panel2RichString.applyFont(startIndex, endIndex, richString.getFontOfFormattingRun(1));
+						startIndex = s.indexOf(bobinasTemplate.getBarco());
+						endIndex = startIndex + bobinasTemplate.getBarco().length();
+						panel2RichString.applyFont(startIndex, endIndex, richString.getFontOfFormattingRun(1));
+					}
+					if (panel3col1 == clienteAnchor.getCol1() && panel3row1 == clienteAnchor.getRow1()) {
+						panel3RichString = new HSSFRichTextString(richString.getString());
+						panel3RichString.applyFont(richString.getFontAtIndex(0));
+					}
+				}
+			}
+			HSSFTextbox shapePanel1 = pat.createTextbox(new HSSFClientAnchor(0, 0, 0, 0, (short) panel1col1,
+					pointerStartHeader, (short) (panel1col1 + 11), pointerStartHeader + 4));
+			shapePanel1.setLineStyleColor(lineStyleColor);
+			shapePanel1.setString(panel1RichString);
+			shapePanel1.setMarginTop(MARGIN_PANELES_TEXT);
+			shapePanel1.setMarginBottom(MARGIN_PANELES_TEXT);
+			shapePanel1.setMarginLeft(MARGIN_PANELES_TEXT);
+			shapePanel1.setMarginRight(MARGIN_PANELES_TEXT);
+			pointerStartHeader += 4;
+			HSSFTextbox shapePanel2 = pat.createTextbox(new HSSFClientAnchor(0, 20, 0, 0, (short) 1, pointerStartHeader,
+					(short) 5, pointerStartHeader + 4));
+			shapePanel2.setLineStyleColor(lineStyleColor);
+			shapePanel2.setString(panel2RichString);
+			shapePanel2.setMarginTop(MARGIN_PANELES_TEXT);
+			shapePanel2.setMarginBottom(MARGIN_PANELES_TEXT);
+			shapePanel2.setMarginLeft(MARGIN_PANELES_TEXT);
+			shapePanel2.setMarginRight(MARGIN_PANELES_TEXT);
+
+			pointerStartHeader += 4;
+			HSSFTextbox shapePanel3 = pat.createTextbox(new HSSFClientAnchor(0, 15, 0, 200, (short) 1,
+					pointerStartHeader, (short) 5, pointerStartHeader + 4));
+			shapePanel3.setLineStyleColor(lineStyleColor);
+			shapePanel3.setString(panel3RichString);
+			shapePanel3.setMarginTop(MARGIN_PANELES_TEXT);
+			shapePanel3.setMarginBottom(MARGIN_PANELES_TEXT);
+			shapePanel3.setMarginLeft(MARGIN_PANELES_TEXT);
+			shapePanel3.setMarginRight(MARGIN_PANELES_TEXT);
+
+		}
+		if (isPrimerBloque) {
+			for (HSSFShape shape : pat.getChildren()) {
+				if (shape instanceof HSSFTextbox) {
+					HSSFTextbox textbox = (HSSFTextbox) shape;
+					textbox.setMarginBottom(MARGIN_PANELES_TEXT);
+					textbox.setMarginTop(MARGIN_PANELES_TEXT);
+					textbox.setMarginRight(MARGIN_PANELES_TEXT);
+					textbox.setMarginLeft(MARGIN_PANELES_TEXT);
+					HSSFRichTextString richString = textbox.getString();
+					String str = richString.getString();
+					if (str.contains(VAR_VESSEL) && str.contains(VAR_FECHA)) {
+						var strUpdate = StringUtils.replace(str, VAR_VESSEL, bobinasTemplate.getBarco());
+						strUpdate = StringUtils.replace(strUpdate, VAR_FECHA, fechaHoy);
+						// update
+						HSSFRichTextString stringRichUpdate = new HSSFRichTextString(strUpdate);
+						stringRichUpdate.applyFont(richString.getFontAtIndex(0));
+
+						int startIndex = strUpdate.indexOf(fechaHoy);
+						int endIndex = startIndex + fechaHoy.length();
+						stringRichUpdate.applyFont(startIndex, endIndex, fontDatosInsert);
+						startIndex = strUpdate.indexOf(bobinasTemplate.getBarco());
+						endIndex = startIndex + bobinasTemplate.getBarco().length();
+						stringRichUpdate.applyFont(startIndex, endIndex, fontDatosInsert);
+						textbox.setString(stringRichUpdate);
+
+					}
+				}
+			}
+		}
 	}
 
 }
