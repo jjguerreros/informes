@@ -21,7 +21,7 @@ public class Utilidades {
 	@Value("${user.home}")
 	private String userHomePath;
 
-	public boolean crearDirectorio(String pathString) {
+	public boolean crearDirectorio(String pathString) throws Exception {
 		var result = false;
 		try {
 			var pathStringDirectories = StringUtils.substringAfter(pathString, userHomePath);
@@ -40,7 +40,7 @@ public class Utilidades {
 			}
 		} catch (Exception e) {
 			log.error("Error creando directorios", e);
-			return false;
+			throw e;
 		}
 		return result;
 	}

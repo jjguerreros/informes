@@ -1,9 +1,8 @@
 package com.puerto.bobinas.informes.stages;
 
 import java.net.URL;
+import java.nio.file.Path;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
@@ -35,6 +34,10 @@ public class PrimaryStageInitializer implements ApplicationListener<StageReadyEv
 	private Resource appIcon;
 	@Value("${fileChooser.directory.root}")
 	private String directoryRootPath;
+	@Value("${fileChooser.directory.excels.entrada}")
+	private String entradaDirectory;
+	@Value("${fileChooser.directory.excels.salida}")
+	private String salidaDirectory;
 	@Autowired
 	private Utilidades utilidades;
 	private final ApplicationContext applicationContext;
@@ -47,7 +50,15 @@ public class PrimaryStageInitializer implements ApplicationListener<StageReadyEv
 	public void onApplicationEvent(StageReadyEvent event) {
 		Stage stage = event.getStage();
 		try {
-			utilidades.crearDirectorio(directoryRootPath);
+			if (utilidades.crearDirectorio(directoryRootPath)) {
+				log.info("Directorio {} creado", Path.of(directoryRootPath));
+			}
+			if (utilidades.crearDirectorio(entradaDirectory)) {
+				log.info("Directorio {} creado", Path.of(entradaDirectory));
+			}
+			if (utilidades.crearDirectorio(salidaDirectory)) {
+				log.info("Directorio {} creado", Path.of(salidaDirectory));
+			}
 			URL url = fxml.getURL();
 			FXMLLoader loader = new FXMLLoader(url);
 			loader.setControllerFactory(applicationContext::getBean);
