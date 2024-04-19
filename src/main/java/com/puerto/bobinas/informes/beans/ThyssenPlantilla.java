@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DateUtils;
 import org.apache.poi.ss.usermodel.Cell;
@@ -141,27 +142,42 @@ public class ThyssenPlantilla extends AbstractPlantilla {
 		generarPieBloque(workbook, sheet, bobinaRowPos, false);
 		inputStream.close();
 
-		var salidaGeneradaPath = new StringBuilder();
-		salidaGeneradaPath.append(salidaDirectory);
-		salidaGeneradaPath.append("/");
-		salidaGeneradaPath.append(ClientesEnum.THYSSEN.name());
-		if (utilidades.crearDirectorio(salidaGeneradaPath.toString())) {
-			log.info("Directorio {} creado", Path.of(salidaGeneradaPath.toString()));
+		var salidaDirectoryPath = new StringBuffer();
+		salidaDirectoryPath.append(salidaDirectory);
+		salidaDirectoryPath.append("/");
+		salidaDirectoryPath.append(ClientesEnum.THYSSEN.name());
+		if (utilidades.crearDirectorio(salidaDirectoryPath.toString())) {
+			log.info("Directorio {} creado", Path.of(salidaDirectoryPath.toString()));
 		}
-		salidaGeneradaPath.append("/");
-		salidaGeneradaPath.append("REPORT");
-		salidaGeneradaPath.append(StringUtils.SPACE);
-		salidaGeneradaPath.append("MUELLE");
-		salidaGeneradaPath.append(StringUtils.SPACE);
-		salidaGeneradaPath.append(bobinasTemplate.getBarco());
-		salidaGeneradaPath.append(".xlsx");
-		FileOutputStream outputStream = new FileOutputStream(salidaGeneradaPath.toString());
+		var salidaGeneradaMuellePath = new StringBuilder(salidaDirectoryPath.toString());
+		salidaGeneradaMuellePath.append("/");
+		salidaGeneradaMuellePath.append("REPORT");
+		salidaGeneradaMuellePath.append(StringUtils.SPACE);
+		salidaGeneradaMuellePath.append("MUELLE");
+		salidaGeneradaMuellePath.append(StringUtils.SPACE);
+		salidaGeneradaMuellePath.append(bobinasTemplate.getBarco());
+		salidaGeneradaMuellePath.append(".xlsx");
+		FileOutputStream outputStream = new FileOutputStream(salidaGeneradaMuellePath.toString());
 		workbook.write(outputStream);
 		workbook.close();
 		outputStream.close();
-		log.info("Excel creado correctamente: {}", Path.of(salidaGeneradaPath.toString()));
-		Path path = Path.of(salidaGeneradaPath.toString());
-		return path;
+		Path pathMuelle = Path.of(salidaGeneradaMuellePath.toString());
+		log.info("Excel creado correctamente: {}", pathMuelle);
+		// Bodega
+		var salidaGeneradaBodegaPath = new StringBuilder(salidaDirectoryPath.toString());
+		salidaGeneradaBodegaPath.append("/");
+		salidaGeneradaBodegaPath.append("REPORT");
+		salidaGeneradaBodegaPath.append(StringUtils.SPACE);
+		salidaGeneradaBodegaPath.append("BODEGA");
+		salidaGeneradaBodegaPath.append(StringUtils.SPACE);
+		salidaGeneradaBodegaPath.append(bobinasTemplate.getBarco());
+		salidaGeneradaBodegaPath.append(".xlsx");
+		Path pathBodega = Path.of(salidaGeneradaBodegaPath.toString());
+		FileUtils.copyFile(pathMuelle.toFile(), pathBodega.toFile());
+		if (pathBodega.toFile().exists()) {
+			log.info("Excel creado correctamente: {}", pathBodega);
+		}
+		return pathMuelle;
 	}
 
 	@Override
