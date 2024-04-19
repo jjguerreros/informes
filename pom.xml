@@ -11,7 +11,7 @@
 	</parent>
 	<groupId>com.puerto.bobinas</groupId>
 	<artifactId>informes</artifactId>
-	<version>0.0.2-SNAPSHOT</version>
+	<version>0.0.3-SNAPSHOT</version>
 	<name>informes</name>
 	<description>Gestion informes estado bobinas</description>
 	<properties>
